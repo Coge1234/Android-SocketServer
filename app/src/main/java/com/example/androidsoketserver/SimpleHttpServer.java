@@ -7,6 +7,8 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -19,10 +21,12 @@ public class SimpleHttpServer {
     private boolean isEnable;
     private ServerSocket socket;
     private final ExecutorService threadPool;
+    private Set<IResourceUriHandler> resourcehandlers;
 
     public SimpleHttpServer(WebConfiguration webConfig) {
         this.webConfig = webConfig;
         threadPool = Executors.newCachedThreadPool();
+        resourcehandlers = new HashSet<IResourceUriHandler>();
     }
 
     /**
@@ -71,6 +75,10 @@ public class SimpleHttpServer {
         }
     }
 
+    public void registerResourcehandler(IResourceUriHandler handler) {
+        resourcehandlers.add(handler);
+    }
+
     private void onAcceptRemotePeer(Socket remotePeer) {
         try {
             HttpContext httpContext = new HttpContext();
@@ -78,21 +86,27 @@ public class SimpleHttpServer {
 //            remotePeer.getOutputStream().write("congratulations, connected successful".getBytes());
             InputStream nis = remotePeer.getInputStream();
             String headerLine = null;
-            headerLine = StreamToolkit.readLine(nis).split(" ")[1];
-            Log.d("spy", headerLine);
+            String resourceUri = headerLine = StreamToolkit.readLine(nis).split(" ")[1];
+            Log.d("spy", resourceUri);
             while ((headerLine = StreamToolkit.readLine(nis)) != null) {
                 if (headerLine.equals("\r\n")) {
                     break;
                 }
                 String[] pair = headerLine.split(": ");
                 if (pair.length > 1) {
-                    httpContext.addRequestHeader(pair[0], pair[1]);
+                    httpContext.addRequestHeader(pair[0], pair[1].replace("\r\n",""));
                 }
                 Log.d("spy", headerLine);
             }
+            for (IResourceUriHandler handler : resourcehandlers) {
+                if (!handler.accept(resourceUri)) {
+                    continue;
+                }
+                handler.handler(resourceUri, httpContext);
+            }
         } catch (IOException e) {
             Log.e("spy", e.toString());
-        }finally {
+        } finally {
             try {
                 remotePeer.close();
             } catch (IOException e) {

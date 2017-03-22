@@ -1,5 +1,6 @@
 package com.example.androidsoketserver;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -21,5 +22,15 @@ public class StreamToolkit {
             return null;
         }
         return sb.toString();
+    }
+
+    public static byte[] readRawFromStream(InputStream fis) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        byte[] buffer = new byte[10240];
+        int nReaded;
+        while((nReaded = fis.read(buffer))>0){
+            bos.write(buffer,0,nReaded);
+        }
+        return bos.toByteArray();
     }
 }
